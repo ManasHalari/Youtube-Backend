@@ -36,5 +36,7 @@ const videoSchema=new mongoose.Schema({
     }
 
 },{timestamps:true})
+
+//we can't give a videos to the user so we will give limited no. of videos
 videoSchema.plugin(mongooseAggregatePaginate)
 export const Video=mongoose.model("Video",videoSchema)

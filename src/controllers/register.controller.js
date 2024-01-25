@@ -4,6 +4,7 @@ import  emailValidator from "email-validator"
 import { User } from "../models/yt/user.model.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
+import mongoose from "mongoose";
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     //why try catch? bcz there is so many DB calls it could be possible that it can fail
@@ -276,4 +277,289 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 
 
+})
+
+export const changeCurrentPassword = asyncHandler(async(req, res) => {
+    //first we check user is authenticate or not from that we we get _id
+    //take email and old password and new password from body
+    //check if user with email and password is available 
+    //if user exists then change the password
+
+    const {old_password,new_password}=req.body;
+
+    if (
+        [old_password,  new_password].some((field) => field?.trim === "")
+    ) {
+        throw new ApiError(400, "All fields are required")
+    }
+
+    // check password
+    const passwordRegEx=/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z]).{8,}$/gm
+    const validPassword=passwordRegEx.test(new_password);
+    if (!validPassword) {
+        throw new ApiError(400, "new password must contain at least 8 characters /n must contain at least 1 uppercase letter/n 1 lowercase letter/n and 1 number/n Can contain special characters")
+        
+    }
+    const user = await User.findById(req.user?._id)
+    //check if password is valid or not
+    const isPasswordValid=await user.isPasswordCorrect(old_password)
+
+    if (!isPasswordValid) {
+        throw new ApiError(400,"Password is incorrect")
+    }
+
+    user.password=new_password
+    //validateBeforeSave is imp that indicates that you don't need to check 
+    //validate other factors just do what i have tell you
+    await user.save({validateBeforeSave:false})
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"))
+})
+
+export const getUser=asyncHandler(async(req, res) => {
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200,req.user,"Here's your details" ))
+})
+
+export const updateAccountDetails = asyncHandler(async(req, res) => {
+    //get details from req.body and name must be same which we put in DB otherwise when we save this thing it wi be a probem
+    const {username,email}=req.body;
+
+    if (
+        [username, email].some((field) => field?.trim === "")
+    ) {
+        throw new ApiError(400, "All fields are required")
+    }
+
+    // check  email
+    const validEmail=emailValidator.validate(email);
+    if (!validEmail) {
+        throw new ApiError(400, "Email is Incorect")
+    }
+
+    const newUser=await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            // here you must know that name of you write beow and name in DB name must be same otherwise things wi nt be updated
+            username,
+            email
+        },
+        {
+            // this for getting new info. fro DB
+            new:true
+        }
+        ).select("-password  -refreshToken")
+
+        if (!newUser) {
+            throw new ApiError(500, "can't create user")
+        }
+    
+        return res
+        .status(200)
+        .json(new ApiResponse(200,newUser,"Here's your details" ))
+})
+
+export const updateUserAvatar = asyncHandler(async(req, res) => {
+        //we get avatar path so put it on cloudinary
+        //if avatar is upladed then give error
+        //save that avatar ur in DB
+        //otherwise give response
+            // TODO: delete old image - assignment
+            // we need to make utility functon which will delete the image on cloudinary
+
+        // only one file is coming so don't write files it is only file in register we are taking two files so we write files
+        const avatarLocalPath=req.file?.path;
+
+        if (!avatarLocalPath) {
+            throw new ApiError(400, "Avatar is required")
+        }
+
+        const avatar=uploadOnCloudinary(avatarLocalPath)
+
+        //don't forget that you must not send password and refreshToken
+        const newUser=await User.findOneAndUpdate(
+            req.user?._id
+            ,
+            {
+                avatar:avatar.url
+            },
+            {
+                new:true
+            }
+            ).select("-password  -refreshToken")
+
+        if (!newUser) {
+            throw new ApiError(400, "User is not created")
+        }
+
+        return res
+    .status(200)
+    .json(new ApiResponse(200,newUser,"Here's your details" ))
+})
+
+export const updateUserCoverImage = asyncHandler(async(req, res) => {
+    const coverImageLocalPath = req.file?.path
+
+    if (!coverImageLocalPath) {
+        throw new ApiError(400, "Cover image file is missing")
+    }
+
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+
+    if (!coverImage.url) {
+        throw new ApiError(400, "Error while uploading on avatar")
+        
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+           
+                coverImage: coverImage.url
+        },
+        {new: true}
+    ).select("-password -refreshToken")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user, "Cover image updated successfully")
+    )
+})
+
+export const getUserChannelProfile = asyncHandler(async(req, res) => {
+    const {username} = req.params
+
+    if (username?.trim()=="") {
+        throw new ApiError(400, "username is missing")
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        {
+            //performing left outer join bcz we want user's details too and that can be happen by lookup
+
+            //for finding channel's subscribers
+            $lookup: {
+                from:"subscriptions",
+                //from this field we are performing join with the foreignField
+                localField: "_id",
+                 // we are finding localfield in forignfield that this thing exist or not 
+                foreignField:"channel",
+                as:"myTotalSubscribers"
+            }
+        },
+        {
+            $lookup: {
+                //for finding that which channel's are subscribed by that channel
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                channelsSubscribedToCount: {
+                    $size: "$subscribedTo"
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                username: 1,
+                subscribersCount: 1,
+                channelsSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1
+
+            }
+        }
+    ])
+    console.log(channel)
+    if (!channel) {
+        throw new ApiError(404, "channel does not exists")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "User channel fetched successfully")
+    )
+})
+
+export const getWatchHistory = asyncHandler(async(req, res) => {
+    const user = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                //sub-pipeline is required bcz it has owner field which is dependent on user model
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields:{
+                            //we get array and we want first element from that
+                            owner:{
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user[0].watchHistory,
+            "Watch history fetched successfully"
+        )
+    )
 })

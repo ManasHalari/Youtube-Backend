@@ -12,10 +12,11 @@ app.use(cors())
 // routes import
 
 import userRouter from "./routes/user.routes.js"
+import videoRouter from "./routes/video.routes.js"
 
 //decare rutes
 
 app.use("/api/v1/users",userRouter)
 // http://localhost:8000/api/v1/users/register
-
+app.use("/api/v1/videos",videoRouter )
 export default app;

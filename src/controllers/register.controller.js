@@ -166,7 +166,9 @@ export const loginUser=asyncHandler(async (req,res)=>{
      const {accessToken, refreshToken} = await generateAccessAndRefereshTokens(user._id)
     
      //we are making one more DB call bcz value of user is updated so refresh Token is new so we are making new call and  don't send password and refreshToken
-     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+     const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken"
+        )
 
      const options = {
         httpOnly: true,

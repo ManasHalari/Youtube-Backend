@@ -19,7 +19,7 @@ const videoSchema=new mongoose.Schema({
         required: true
     },
     duration: {
-        type: Number, 
+        type: String, 
         required: true
     },
     views: {
@@ -31,7 +31,7 @@ const videoSchema=new mongoose.Schema({
         default: true
     },
     owner: {
-        type: Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     }
 

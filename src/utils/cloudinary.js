@@ -25,3 +25,44 @@ export const uploadOnCloudinary =async function(localFilePath){
         return null;
     }
 }
+
+export const deleteImageOnCloudinary=async function(cloudinary_public_id){
+    try {
+        if (!cloudinary_public_id) {
+            return null;
+        }
+       const res=await cloudinary.uploader.destroy(
+        cloudinary_public_id,
+        {
+            resource_type:"image"    
+        },(result,err)=>{
+            // console.log("result",result);
+            return result;
+        })
+        // console.log("res",res);
+        return res;
+    } catch (error) {
+        console.log("image is not deleted from cloudinary",error);
+    }
+}
+
+export const deleteVideoOnCloudinary=async function(cloudinary_public_id){
+    try {
+        if (!cloudinary_public_id) {
+            return null;
+        }
+        //here type of public id is string
+       const res=await cloudinary.uploader.destroy(
+        cloudinary_public_id,
+        {
+            resource_type:"video"    
+        },(result,err)=>{
+            // console.log("result",result);
+            return result;
+        })
+        // console.log("res",res);
+        return res;
+    } catch (error) {
+        console.log("video is not deleted from cloudinary",error);
+    }
+}

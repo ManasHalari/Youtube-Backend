@@ -10,6 +10,15 @@ const videoSchema=new mongoose.Schema({
         type: String, //cloudinary url
         required: true
     },
+    //cloudinary public_id is reqiured if we want to remove that asset
+    cloudinay_public_idOfVideo:{
+        type:String,
+        required:true
+    },
+    cloudinay_public_idOfImage:{
+        type:String,
+        required:true
+    },
     title: {
         type: String, 
         required: true

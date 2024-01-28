@@ -1,11 +1,8 @@
-
-
-
 import { Video } from "../models/yt/video.model.js";
 import {ApiError} from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import {deleteImageOnCloudinary, deleteVideoOnCloudinary, uploadOnCloudinary} from "../utils/cloudinary.js"
 
 function secondsToHms(d) {
     d = Number(d);
@@ -63,7 +60,9 @@ export const publishAVideo = asyncHandler(async (req, res) => {
         //here write that name which is as saved in DB not thumbnailUrl
         thumbnail: thumbnailResponse?.secure_url,
         isPublished:true,
-        duration:time
+        duration:time,
+        cloudinay_public_idOfVideo:videoResponse?.public_id,
+        cloudinay_public_idOfImage:thumbnailResponse?.public_id
     })
 
     if (!video) {
@@ -107,4 +106,140 @@ export const getVideoById = asyncHandler(async (req, res) => {
     return res.status(201).json(
         new ApiResponse(200,videoDetails,  "video fetched Successfully")
     )   
+})
+
+export const updateVideoTextPart = asyncHandler(async (req, res) => {
+    //take video id from user
+    //check in DB that video is available or not
+    //if video is available then update title and description
+    //if thubnail and video is present than do other things
+
+   const {videoId}=req.params;
+   
+   if (!videoId) {
+    throw new ApiError(400, "videoId is required")
+   } 
+
+   //take decription and title from body
+   const {title,description}=req.body;
+
+   //check if it is present in DB
+
+   const videoDetails=await Video.findByIdAndUpdate(
+    videoId,
+    {
+        title,
+        description
+    },
+    {
+        new:true
+    }
+    
+    )
+
+   if (!videoDetails) {
+    throw new ApiError(400, "video doesn't exist")
+   } 
+
+   return res.status(201).json(
+    new ApiResponse(200,videoDetails, "video updated Successfully")
+)  
+
+   
+})
+
+export const updateVideoFilesPart = asyncHandler(async (req, res) => {
+    //take video id from user
+    //check in DB that video is available or not
+    //if video is available then update title and description
+    //if thubnail and video is present than do other things
+
+   const {videoId}=req.params;
+   
+   if (!videoId) {
+    throw new ApiError(400, "videoId is required")
+   } 
+
+   //take path from files
+   const newVideoLocalPath=req.files?.videoFile[0]?.path;
+   const newThumbnailLocalPath=req.files?.thumbnail[0]?.path;
+
+   //check if file is available or not
+   if (!newThumbnailLocalPath || !newVideoLocalPath) {
+    throw new ApiError(400,"files are required")
+   }
+
+   console.log(newThumbnailLocalPath,newVideoLocalPath);
+
+   //upload file on cloudinary
+   const videoResponse=await uploadOnCloudinary(newVideoLocalPath)
+   const thumbnailResponse=await uploadOnCloudinary(newThumbnailLocalPath)
+
+   console.log(videoResponse,thumbnailResponse);
+   if (!videoResponse || !thumbnailResponse) {
+       throw new ApiError(500,"files are not uploaded")
+   }
+
+   // now delete that asset which is present in cloudinary
+   //here we need to put public_id of that asset which is presnt on cloudinary for that we have stored public_id of that asset in our DB
+   //for that first make one DB call
+   let videoInDB= await Video.findById(videoId);
+   await deleteVideoOnCloudinary(videoInDB.cloudinay_public_idOfVideo);
+                             
+   await deleteImageOnCloudinary(videoInDB.cloudinay_public_idOfImage);
+
+   //check if it is present in DB
+
+   let time=secondsToHms(videoResponse?.duration);
+
+   const newVideoDetails=await Video.findByIdAndUpdate(
+    videoId,
+    {
+        thumbnail:thumbnailResponse.secure_url,
+        videoFile:videoResponse.secure_url ,
+        duration:time,
+        cloudinay_public_idOfImage:thumbnailResponse.public_id,
+        cloudinay_public_idOfVideo:videoResponse.public_id
+    },
+    {
+        new:true
+    }
+    
+    )
+
+   return res.status(201).json(
+    new ApiResponse(200,newVideoDetails, "video files  updated Successfully")
+)  
+
+   
+})
+
+export const deleteVideo = asyncHandler(async (req, res) => {
+    //take videoId from user through params
+    //delete video and file from cloudinary for that we have public_id in DB
+    //delete that video from DB
+
+    const { videoId } = req.params
+
+    if (!videoId) {
+        throw new ApiError(400, "videoId is required")
+       } 
+
+
+   //delete that assets which are present on cloudinary
+   const videoInDB=await Video.findById(videoId)
+
+   if (!videoInDB) {
+    throw new ApiError(400, "video is not required")
+   } 
+   await deleteVideoOnCloudinary(videoInDB.cloudinay_public_idOfVideo);
+                             
+   await deleteImageOnCloudinary(videoInDB.cloudinay_public_idOfImage);
+    
+   //delete that video
+   await Video.findByIdAndDelete(videoId)
+    return res.status(201).json(
+        new ApiResponse(200, "video removed Successfully")
+    )  
+
 })

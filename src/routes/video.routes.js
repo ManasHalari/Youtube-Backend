@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import {
+    deleteVideo,
     getVideoById,
-    publishAVideo,   
+    publishAVideo,
+    updateVideoFilesPart,
+    updateVideoTextPart,   
 } from "../controllers/video.controller.js"
 import {verifyJWT} from "../middlewares/auth.middleware.js"
 import {upload} from "../middlewares/multer.middleware.js"
@@ -29,4 +32,20 @@ router
     router
     .route("/:videoId")
     .get(getVideoById)
+    .patch(updateVideoTextPart)
+
+    router
+    .route("/:videoId")
+    .post( upload.fields([
+        {
+            name: "videoFile",
+            maxCount: 1,
+        },
+        {
+            name: "thumbnail",
+            maxCount: 1,
+        },
+        
+    ]),updateVideoFilesPart)
+    .delete(deleteVideo)
 export default router

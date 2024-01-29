@@ -146,7 +146,7 @@ export const getAllVideos = asyncHandler(async (req, res) => {
           },
           {
             title: {
-              //matches pattern on the basis of this query that this query
+              //matches pattern on the basis of this query that this query matvhes with title or not
               $regex: query,
               $options: "i",
             },

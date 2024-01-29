@@ -1,4 +1,5 @@
-import mongoose from "mongoose";
+import mongoose,{Schema} from "mongoose";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const likesSchema=new mongoose.Schema({
     video: {
@@ -20,5 +21,8 @@ const likesSchema=new mongoose.Schema({
 
 
 },{timestamps:true})
+
+//we can't give a all videos which are liked to the user so we will give limited no. of videos
+likesSchema.plugin(mongooseAggregatePaginate)
 
 export const Like=mongoose.model("Like",likesSchema)

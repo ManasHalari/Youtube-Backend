@@ -1,3 +1,5 @@
+import mongoose, { isValidObjectId } from "mongoose";
+import { User } from "../models/yt/user.model.js";
 import { Video } from "../models/yt/video.model.js";
 import {ApiError} from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -62,7 +64,8 @@ export const publishAVideo = asyncHandler(async (req, res) => {
         isPublished:true,
         duration:time,
         cloudinay_public_idOfVideo:videoResponse?.public_id,
-        cloudinay_public_idOfImage:thumbnailResponse?.public_id
+        cloudinay_public_idOfImage:thumbnailResponse?.public_id,
+        owner: req.user._id,
     })
 
     if (!video) {
@@ -82,6 +85,92 @@ export const publishAVideo = asyncHandler(async (req, res) => {
    
     
 
+})
+
+export const getAllVideos = asyncHandler(async (req, res) => {
+    // Steps to get all video
+  // take all required information from req.query
+  // Now, validate all fields to check they are not empty
+  /* sortBy -> tells by which field to sort (eg. title, description, etc)
+   * sortType -> tells two options ascending(asc) or descending(desc)
+   */
+  // Now, use mongodb aggregation pipeline
+  // 1. $match using $and operator both the query and userId
+  // 2. sort order taken from the req.query
+  // 3. use mongodb aggregate paginate
+
+  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+
+  if (!isValidObjectId(userId)) {
+    throw new ApiError(400, "Invalid user id");
+  }
+
+  if (!query || !sortBy || !sortType) {
+    throw new ApiError(404, "All fields are required");
+  }
+
+  const userExists = await User.findById(userId);
+
+  if (!userExists) {
+    throw new ApiError(404, "user not found");
+  }
+
+  const options = {
+    page: parseInt(page),
+    limit: parseInt(limit),
+  };
+
+  // create sortOptions
+  let sortOptions = {};
+
+  /* Here, if sortBy exists  then it set sortOptions property to sortBy using [] bracket notation
+   *  and its value is set using ternary operation that says if sortType === desc then
+   *  set sortOptions[sortBy] to -1 else 1
+   *
+   * You can also write the below condition like this
+   *
+   *    let sortOptions = {
+   *        [sortBy]: sortType === 'desc' ? -1 : 1
+   *    }
+   */
+  if (sortBy) {
+    sortOptions[sortBy] = sortType === "desc" ? -1 : 1;
+  }
+
+  const videoAggregationPipeline = Video.aggregate([
+    {
+      $match: {
+        $and: [
+          {
+            owner: new mongoose.Types.ObjectId(userId),
+          },
+          {
+            title: {
+              //matches pattern on the basis of this query that this query
+              $regex: query,
+              $options: "i",
+            },
+          },
+        ],
+      },
+    },
+    {
+      $sort: sortOptions,
+    },
+  ]);
+
+  const resultedVideo = await Video.aggregatePaginate(
+    videoAggregationPipeline,
+    options
+  );
+
+  if (resultedVideo.totalDocs === 0) {
+    return res.status(200).json(new ApiResponse(200, {}, "user has no video"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, resultedVideo, "video fetched successfully"));
 })
 
 export const getVideoById = asyncHandler(async (req, res) => {
@@ -242,4 +331,34 @@ export const deleteVideo = asyncHandler(async (req, res) => {
         new ApiResponse(200, "video removed Successfully")
     )  
 
+})
+
+export const togglePublishStatus = asyncHandler(async (req, res) => {
+    //take videoId from user
+    //find that video in DB and toogle or say reverse which is value of published
+    const { videoId } = req.params
+
+    if (!videoId) {
+        throw new ApiError(400, "videoId is required")
+       } 
+
+       //find that video in DB
+    const newVideoDetails=await Video.findById(videoId)
+
+    if (newVideoDetails.isPublished) {
+        newVideoDetails.isPublished=false
+        await newVideoDetails.save()
+    }
+    else{
+    newVideoDetails.isPublished=true;
+    await newVideoDetails.save();
+    }
+
+    if (!newVideoDetails) {
+        throw new ApiError(400, "video is not found")
+    }
+
+    return res.status(201).json(
+        new ApiResponse(200,newVideoDetails, "video toggle Successfully")
+    )  
 })

@@ -1,4 +1,4 @@
-import {isValidObjectId} from "mongoose"
+import mongoose,{isValidObjectId} from "mongoose"
 import { Like } from "../models/yt/like.model.js"
 import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
@@ -24,7 +24,7 @@ export const toggleVideoLike = asyncHandler(async (req, res) => {
 
     //finding that user and video has already liked
 
-    const likedVideo=await Like.find({
+    const likedVideo=await Like.findOne({
         $and:[
         {likedBy:req.user._id},
         {video:videoId}
@@ -32,9 +32,10 @@ export const toggleVideoLike = asyncHandler(async (req, res) => {
     })
 
     //if there is already any video liked which is present in Like DB then remove that
-    //here likedVideo exists mean there is some data which means video is liked which means else part will execute
-    if (!likedVideo) {
-        const deletedVideo=await Like.deleteOne({video:videoId})
+    
+    if (likedVideo) {
+        //here likeVideo not Like which is DB
+        const deletedVideo=await likedVideo.deleteOne();
 
         if (!deletedVideo) {
             throw new ApiError(400, "Video is not deleted")

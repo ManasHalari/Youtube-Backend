@@ -1,5 +1,6 @@
 import mongoose, {Schema} from "mongoose";
 
+//it's like a community post in yt
 const tweetSchema = new Schema({
     content: {
         type: String,

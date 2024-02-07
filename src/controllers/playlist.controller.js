@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 import { asyncHandler } from "../utils/asyncHandler.js"
 import { User } from "../models/yt/user.model.js"
+import {Video} from "../models/yt/video.model.js"
 
 
 export const createPlaylist = asyncHandler(async (req, res) => {
@@ -166,4 +167,112 @@ export const deletePlaylist = asyncHandler(async (req, res) => {
     return res
     .status(201)
     .json(new ApiResponse(200,  "Playlist deleted successfully"));
+})
+
+export const addVideoToPlaylist = asyncHandler(async (req, res) => {
+    //verify that we got all field or not
+    //find that  video and playlist exist or not
+    //add the video to the playlist
+
+    const {playlistId, videoId} = req.params
+
+    if (!playlistId) {
+        throw new ApiError(404, "playlistId is  required");
+    }
+
+    if (!isValidObjectId(playlistId)) {
+        throw new ApiError(404, "playlistId is not vaid");
+    }
+
+    if (!videoId) {
+        throw new ApiError(404, "playlistId is  required");
+    }
+
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(404, "playlistId is not vaid");
+    }
+
+    const videoExists=await Video.findById(videoId)
+
+    if (!videoExists) {
+        throw new ApiError(404, "video do not exists");
+    }
+
+    const playlistExists=await Playlist.findById(playlistId)
+
+    if (!playlistExists) {
+        throw new ApiError(404, "Playlist do not exists");
+    }
+
+    await  playlistExists.videos.push(videoId);
+
+    const newPlayList=await playlistExists.save();
+
+    return res
+    .status(201)
+    .json(new ApiResponse(200, newPlayList, "in Playlist Video added successfully"));
+    
+})
+
+export const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
+    //verify that we got all field or not
+    //here don't need to check that video exists or not because if it exists then we remove or not found message will given
+    //find that playlist exist or not
+    //check that video exists in playlist or not
+    //it it exists then delete that video
+
+    const {playlistId, videoId} = req.params
+    
+    if (!playlistId) {
+        throw new ApiError(404, "playlistId is  required");
+    }
+
+    if (!isValidObjectId(playlistId)) {
+        throw new ApiError(404, "playlistId is not vaid");
+    }
+
+    if (!videoId) {
+        throw new ApiError(404, "playlistId is  required");
+    }
+
+    if (!isValidObjectId(videoId)) {
+        throw new ApiError(404, "playlistId is not vaid");
+    }
+
+    const playlistExists=await Playlist.findById(playlistId)
+
+    if (!playlistExists) {
+        throw new ApiError(404, "Playlist do not exists");
+    }
+
+    const videoExistsinArray=await playlistExists.videos.find((video) => video==videoId)
+
+    console.log(videoExistsinArray);
+
+    if (!videoExistsinArray) {
+        throw new ApiError(404, "video do not exists in Array");
+    }
+
+    const videoDeleted=await playlistExists.videos.filter(function(video) {
+        //here need to give that array
+        return video !== videoExistsinArray
+    })
+    
+    console.log(videoDeleted);
+
+    if (!videoDeleted) {
+        throw new ApiError(404, "video deletion failed");
+    }
+
+    playlistExists.videos=videoDeleted;
+
+    const newPlayList=await playlistExists.save();
+
+    if (!newPlayList) {
+        throw new ApiError(404, "Can't fetch videos");
+    }
+
+    return res
+    .status(201)
+    .json(new ApiResponse(200, newPlayList, "in Playlist Video deleted successfully"));
 })

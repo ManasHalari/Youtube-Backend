@@ -92,6 +92,33 @@ export const getUserPlaylists = asyncHandler(async (req, res) => {
     
 })
 
+export const getPlaylistById = asyncHandler(async (req, res) => {
+    //verify that we got playlistId or not
+    //check in Playlist DB that playlistId is there or not
+    //if there is then give response
+
+    const {playlistId} = req.params
+
+    if (!playlistId) {
+        throw new ApiError(404, "playlistId is  required");
+    }
+
+    if (!isValidObjectId(playlistId)) {
+        throw new ApiError(404, "playlistId is not vaid");
+    }
+
+    const playlistExists=await Playlist.findById(playlistId)
+
+    if (!playlistExists) {
+        throw new ApiError(404, "playlist is not found");
+    }
+
+    return res
+    .status(201)
+    .json(new ApiResponse(200, playlistExists, "Playlists fetched successfully"));
+    
+})
+
 export const updatePlaylist = asyncHandler(async (req, res) => {
     //verify that we get all fields or not
     //find that playlist in Playlist DB in Update it

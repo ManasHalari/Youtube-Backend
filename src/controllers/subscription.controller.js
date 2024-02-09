@@ -91,7 +91,30 @@ export const getUserChannelSubscribers = asyncHandler(async (req, res) => {
             $match:{
                 channel:new mongoose.Types.ObjectId(channelId)
             }
-        }
+        },
+        {
+            $lookup: {
+              from: "users",
+              localField: "subscriber",
+              foreignField: "_id",
+              as: "subscriberInfo",
+              pipeline: [
+                {
+                  $project: {
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              subscriberInfo: {
+                $first: "$subscriberInfo",
+              },
+            },
+          },
     ])
          
     
@@ -130,7 +153,31 @@ export const getSubscribedChannels = asyncHandler(async (req, res) => {
             $match:{
                 subscriber:new mongoose.Types.ObjectId(subscriberId)
             }
-        }
+        },
+        {
+            $lookup: {
+              from: "users",
+              localField: "channel",
+              foreignField: "_id",
+              as: "channelInfo",
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+          {
+            $addFields: {
+              channelInfo: {
+                $first: "$channelInfo",
+              },
+            },
+          },
     ])
 
     

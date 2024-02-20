@@ -5,6 +5,7 @@ import { User } from "../models/yt/user.model.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import mongoose from "mongoose";
+import jwt  from 'jsonwebtoken'
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     //why try catch? bcz there is so many DB calls it could be possible that it can fail
@@ -14,7 +15,8 @@ const generateAccessAndRefereshTokens = async(userId) =>{
     
        // User no user bcz that info. wi fetch by these tokens
        const accessToken=user.generateAccessToken()
-       const refreshToken=user.generateAccessToken()
+       //recovering mistake of generateRefreshToken
+       const refreshToken=user.generateRefreshToken()
     
        // save refreshToken in DB
         user.refreshToken=refreshToken;
@@ -175,6 +177,9 @@ export const loginUser=asyncHandler(async (req,res)=>{
         secure: true
     }
 
+    loggedInUser.refreshToken=refreshToken
+    await loggedInUser.save({validateBeforeSave:false})
+
     return res
     .status(200)
     .cookie("accessToken", accessToken, options)
@@ -227,26 +232,30 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
     //save new RefreshToken in DB
 
     // taking refresh token
-    const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
-
+    const incomingRefreshToken = req?.cookies?.refreshToken || req?.body?.refreshToken
+    
     if (!incomingRefreshToken) {
         throw new ApiError(401, "unauthorized request")
     }
-
-
+    
     try {
-        // decode that token with secret key which ony contains _id
-        const decodedToken = jwt.verify(
+         // decode that token with secret key which ony contains _id
+        const decodedToken =  jwt.verify(
             incomingRefreshToken,
             process.env.REFRESH_TOKEN_SECRET
         )
-    
-        const user = await User.findById(decodedToken?._id)
-    
+         
+        if (!decodedToken) {
+            throw new ApiError(500, "refresh token is not decoded")
+        }
+
+        const user = await User.findById(decodedToken?.id)
+        
         if (!user) {
             throw new ApiError(401, "Invalid refresh token")
         }
         // in DB and aso user contains same cookie
+        
         if (incomingRefreshToken !== user?.refreshToken) {
             throw new ApiError(401, "Refresh token is expired or used")
             
@@ -260,6 +269,7 @@ export const refreshAccessToken = asyncHandler(async (req, res) => {
         const {accessToken, newRefreshToken} = await generateAccessAndRefereshTokens(user._id)
         
         //save new RefreshToken in DB
+        console.log("a:",accessToken,"b:",newRefreshToken)
 
         user.refreshToken=newRefreshToken
         await user.save({validateBeforeSave:false})
@@ -472,14 +482,14 @@ export const getUserChannelProfile = asyncHandler(async(req, res) => {
         {
             $addFields: {
                 subscribersCount: {
-                    $size: "$subscribers"
+                    $size: "$myTotalSubscribers"
                 },
                 channelsSubscribedToCount: {
                     $size: "$subscribedTo"
                 },
                 isSubscribed: {
                     $cond: {
-                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},
+                        if: {$in: [req.user?._id, "$myTotalSubscribers.subscriber"]},
                         then: true,
                         else: false
                     }

@@ -28,7 +28,7 @@ To deploy this project run
 
 
 ## 🔗 Links
-- [Model_Link](https://app.eraser.io/workspace/YtPqZ1VogxGy1jzIDkzj)
+- [Model_Link]( https://app.eraser.io/workspace/a8fwbknXiL4qb9jpHIow)
 
 
 
